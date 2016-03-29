@@ -1,4 +1,4 @@
-# i7z_short
+# i7z-short
 Read actual CPU clockrate trough /dev/cpu/<cpu_id>/msr
 
 Run as root:
