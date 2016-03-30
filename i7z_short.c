@@ -16,6 +16,8 @@
 
 #define THRESHOLD_BETWEEN_0_6000(cond) (cond>=0 && cond <=10000)? cond: __builtin_inf()
 
+int _DEBUG;
+int _CPUCOUNT;
 unsigned long long int old_val_CORE[MAXCPUS], new_val_CORE[MAXCPUS];
 unsigned long long int old_val_REF[MAXCPUS], new_val_REF[MAXCPUS];
 unsigned long long int old_val_C3[MAXCPUS], new_val_C3[MAXCPUS];
@@ -31,6 +33,62 @@ rdtsc (void)
     unsigned hi, lo;
 __asm__ __volatile__ ("rdtsc":"=a" (lo), "=d" (hi));
     return ((unsigned long long) lo) | (((unsigned long long) hi) << 32);
+}
+
+void Test_Or_Make_MSR_DEVICE_FILES()
+{
+    //test if the msr file exists
+    if (access ("/dev/cpu/0/msr", F_OK) == 0)
+    {
+        if(_DEBUG == 1)
+            printf ("DEBUG: msr device files exist /dev/cpu/*/msr\n");
+        if (access ("/dev/cpu/0/msr", W_OK) == 0)
+        {
+            //a system mght have been set with msr allowable to be written
+            //by a normal user so...
+            //Do nothing.
+            if(_DEBUG == 1)
+                printf ("DEBUG: You have write permissions to msr device files\n");
+        } else {
+            if(_DEBUG == 1) {
+                printf ("DEBUG: You DO NOT have write permissions to msr device files\n");
+                printf ("DEBUG: A solution is to run this program as root\n");
+            }
+            exit (1);
+        }
+    } else {
+        if(_DEBUG == 1)
+            printf ("DEBUG: msr device files DO NOT exist, trying out a makedev script\n");
+        if (geteuid () == 0)
+        {
+            //Try the Makedev script
+            //sourced from MAKEDEV-cpuid-msr script in msr-tools
+            system ("msr_major=202; \
+                            cpuid_major=203; \
+                            n=0; \
+                            while [ $n -lt 16 ]; do \
+                                mkdir -m 0755 -p /dev/cpu/$n; \
+                                mknod /dev/cpu/$n/msr -m 0600 c $msr_major $n; \
+                                mknod /dev/cpu/$n/cpuid -m 0444 c $cpuid_major $n; \
+                                n=`expr $n + 1`; \
+                            done; \
+                            ");
+            if(_DEBUG == 1)
+                printf ("DEBUG: modprobbing for msr\n");
+            system ("modprobe msr");
+        } else {
+            if(_DEBUG == 1) {
+                printf ("DEBUG: You DO NOT have root privileges, mknod to create device entries won't work out\n");
+                printf ("DEBUG: A solution is to run this program as root\n");
+            }
+            exit (1);
+        }
+    }
+}
+
+void modprobing_msr()
+{
+    system("modprobe msr &> /dev/null");
 }
 
 double estimate_MHz ()
@@ -185,14 +243,11 @@ int setActualCpuClockRate()
     unsigned long long int CPU_CLK_UNHALTED_CORE, CPU_CLK_UNHALTED_REF, CPU_CLK_C3, CPU_CLK_C6, CPU_CLK_C1, CPU_CLK_C7;
     int numCPUs = 4;
 
-    //some init registers before we can use performance counters
-    int IA32_PERF_GLOBAL_CTRL = 911; //38F
-    int IA32_PERF_GLOBAL_CTRL_Value;
-    IA32_PERF_GLOBAL_CTRL_Value = get_msr_value (CPU_NUM, IA32_PERF_GLOBAL_CTRL, 63, 0, &error_indx);
-
-    int IA32_FIXED_CTR_CTL = 909; //38D
-    int IA32_FIXED_CTR_CTL_Value;
-    IA32_FIXED_CTR_CTL_Value = get_msr_value (CPU_NUM, IA32_FIXED_CTR_CTL, 63, 0, &error_indx);
+    // 429 test
+    //bits from 0-63 in this store the various maximum turbo limits
+    int MSR_TURBO_RATIO_LIMIT = 429;
+    // 3B defines till Max 4 Core and the rest bit values from 32:63 were reserved.
+    int MAX_TURBO_1C=0, MAX_TURBO_2C=0, MAX_TURBO_3C=0, MAX_TURBO_4C=0, MAX_TURBO_5C=0, MAX_TURBO_6C=0;
 
     int PLATFORM_INFO_MSR = 206;	//CE 15:8
     int PLATFORM_INFO_MSR_low = 8;
@@ -202,18 +257,54 @@ int setActualCpuClockRate()
     //Blck is basically the true speed divided by the multiplier
     float BLCK = estimated_mhz / (float) CPU_Multiplier;
     //printf("estimated_mhz %f, BLCK %f, MULT %d\n", estimated_mhz, BLCK, CPU_Multiplier);
+
+    //Bits:0-7  - core1
+    MAX_TURBO_1C = get_msr_value (CPU_NUM, MSR_TURBO_RATIO_LIMIT, 7, 0, &error_indx);
+    //SET_IF_TRUE(error_indx,online_cpus[0],-1);
+    //Bits:15-8 - core2
+    MAX_TURBO_2C = get_msr_value (CPU_NUM, MSR_TURBO_RATIO_LIMIT, 15, 8, &error_indx);
+    //SET_IF_TRUE(error_indx,online_cpus[0],-1);
+    //Bits:23-16 - core3
+    MAX_TURBO_3C = get_msr_value (CPU_NUM, MSR_TURBO_RATIO_LIMIT, 23, 16, &error_indx);
+    //SET_IF_TRUE(error_indx,online_cpus[0],-1);
+    //Bits:31-24 - core4
+    MAX_TURBO_4C = get_msr_value (CPU_NUM, MSR_TURBO_RATIO_LIMIT, 31, 24, &error_indx);
+    //SET_IF_TRUE(error_indx,online_cpus[0],-1);
+    //gulftown/Hexacore support
+    //technically these should be the bits to get for core 5,6
+    //Bits:39-32 - core4
+    MAX_TURBO_5C = get_msr_value (CPU_NUM, MSR_TURBO_RATIO_LIMIT, 39, 32, &error_indx);
+    //SET_IF_TRUE(error_indx,online_cpus[0],-1);
+    //Bits:47-40 - core4
+    MAX_TURBO_6C = get_msr_value (CPU_NUM, MSR_TURBO_RATIO_LIMIT, 47, 40, &error_indx);
+
+    //some init registers before we can use performance counters
+    int IA32_PERF_GLOBAL_CTRL = 911; //38F
+    int IA32_PERF_GLOBAL_CTRL_Value;
+
+    int IA32_FIXED_CTR_CTL = 909; //38D
+    int IA32_FIXED_CTR_CTL_Value;
+
+    // Init sleeptimer
     struct timespec sleeptimer={0};
     sleeptimer.tv_nsec = 399999999; // 100msec, one more 9 and it will make it to 1s
 
-    for(i=0; i< MAXCPUS; i++) {
+
+    for(i=0; i< _CPUCOUNT; i++) {
         old_val_CORE[i] = new_val_CORE[i] = old_val_REF[i] = new_val_REF[i] = old_val_C3 [i] = new_val_C3 [i] = 0;
         old_val_C6[i] = new_val_C6[i] = new_TSC[i] = old_TSC[i] = 0;
         _FREQ[i] = _MULT[i] = 0;
         C0_time[i] = C1_time[i] = C3_time[i] = C6_time[i] = 0;
     }
 
-    for (ii = 0; ii <  MAXCPUS; ii++) {
-        //read from the performance counters
+    for (ii = 0; ii < _CPUCOUNT; ii++) {
+        // Reset performance counters
+        IA32_PERF_GLOBAL_CTRL_Value = get_msr_value (CPU_NUM, IA32_PERF_GLOBAL_CTRL, 63, 0, &error_indx);
+        set_msr_value (CPU_NUM, IA32_PERF_GLOBAL_CTRL, 0x700000003LLU);
+        IA32_FIXED_CTR_CTL_Value = get_msr_value (CPU_NUM, IA32_FIXED_CTR_CTL, 63, 0, &error_indx);
+        set_msr_value (CPU_NUM, IA32_FIXED_CTR_CTL, 819);
+
+        //read from the performance counters (run1)
         //things like halted unhalted core cycles
 
         CPU_NUM = ii;
@@ -228,8 +319,8 @@ int setActualCpuClockRate()
     nanosleep (&sleeptimer, NULL);
 
     //printf("Id Freq Mult\n");
-    for (ii = 0; ii <  MAXCPUS; ii++) {
-        //note down the counters after the sleep
+    for (ii = 0; ii <  _CPUCOUNT; ii++) {
+        //note down the counters after the sleep (run2)
         CPU_NUM = ii;
         new_val_CORE[ii] = get_msr_value (CPU_NUM, 778, 63, 0, &error_indx);
         new_val_REF[ii] = get_msr_value (CPU_NUM, 779, 63, 0, &error_indx);
@@ -343,6 +434,7 @@ int setCpuSocketInfo()
                 socket = 1;
             }
             _SOCKET[ii] = socket;
+            _CPUCOUNT = ii;
             ii++;
         }
     }
@@ -358,24 +450,23 @@ void print_usage() {
 
 int main(int argc, char *argv[])
 {
+    Test_Or_Make_MSR_DEVICE_FILES();
+    modprobing_msr();
     setCpuSocketInfo();
     setActualCpuClockRate();
 
     int option = 0;
-    int debug = 0, area = -1;
-
+    _DEBUG = 0;
     while ((option = getopt(argc, argv,"apd")) != -1) {
         switch (option) {
-             case 'd' : debug = 1;
-                 break;
-             case 'a' : area = 0;
+             case 'd' : _DEBUG = 1;
                  break;
              default: print_usage(); 
                  exit(EXIT_FAILURE);
         }
     }
 
-    if(debug == 1)
+    if(_DEBUG == 1)
         printf("Set debug on\n");
 
     int ii, socket0_cpunum, socket1_cpunum;
@@ -383,11 +474,11 @@ int main(int argc, char *argv[])
     socket0_cpunum = socket1_cpunum = 0;
     socket0 = socket1 = 0;
 
-    if(debug == 1)
+    if(_DEBUG == 1)
         printf("ProcId\tSocket\tFreq\t\tMult\n");
-    for (ii = 0; ii < MAXCPUS; ii++) {
+    for (ii = 0; ii < _CPUCOUNT; ii++) {
         if(_FREQ[ii] != INFINITY) {
-            if(debug == 1)
+            if(_DEBUG == 1)
                 printf("%d\t%d\t%f\t%f\n", ii, _SOCKET[ii], _FREQ[ii], _MULT[ii]);
             if(_SOCKET[ii] == 0) {
                 socket0_cpunum += 1;
