@@ -1,19 +1,19 @@
 %define booking_repo base
 
-Name:				i7z_short
+Name:				  i7z_short
 Summary:			Show actual processor clock
 
-Version:			0.1
+Version:			0.2
 Release:			1%{?dist}
 
 Group:				Applications/Internet
 License:			BSD with advertising
-URL:				http://code.google.com/p/i7z
+URL:				  http://code.google.com/p/i7z
 
 Source0:			%{name}-%{version}.tar.gz
-#https://github.com/teunis90/i7z_short
+#Source0:     https://github.com/teunis90/%{name}/archive/%{version}.tar.gz#/%{name}-%{version}.tar.gz
 
-BuildRoot:			%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
+BuildRoot:    %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 %description
 Show actual processor clock
@@ -38,6 +38,10 @@ rm -rf $RPM_BUILD_ROOT
 %{_sbindir}/i7z
 
 %changelog
+* Wed Mar 30 2016 Teun Ouwehand <teun.ouwehand@booking.com> 0.2
+- Package i7z-short from https://github.com/teunis90/i7z-short
+* Tue Mar 29 2016 Teun Ouwehand <teun.ouwehand@booking.com> 0.1
+- Package i7z-short from https://github.com/teunis90/i7z-short
 * Tue Mar 22 2016 Teun Ouwehand <teun.ouwehand@booking.com> 0.1
 - Package i7z from https://github.com/ajaiantilal/i7z
 
