@@ -1,5 +1,5 @@
 # i7z-short
-Read actual Intel CPU clockrate trough `/dev/cpu/<cpu_id>/msr`
+Read actual Intel CPU clockrate trough `/dev/cpu/<cpu_id>/msr` and return avarage clockrate per socket. Debug mode shows actual clockrate per core.
 
 Run as root:
 
@@ -8,7 +8,7 @@ Run as root:
     
 Output:
 
-    <metric proc0> [<metric proc1>]
+    <avg clockrate metric socket0> [<avg clockrate metric socket1>]
     
 Tested CPU Types:
 
