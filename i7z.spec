@@ -38,6 +38,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_sbindir}/i7z
 
 %changelog
+* Wed Mar 30 2016 Teun Ouwehand <teun.ouwehand@booking.com> 0.3
+- Added support up to 4 sockets
 * Wed Mar 30 2016 Teun Ouwehand <teun.ouwehand@booking.com> 0.2
 - Package i7z-short from https://github.com/teunis90/i7z-short
 * Tue Mar 29 2016 Teun Ouwehand <teun.ouwehand@booking.com> 0.1

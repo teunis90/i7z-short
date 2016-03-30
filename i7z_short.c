@@ -12,7 +12,7 @@
 #include <math.h>
 #include <regex.h>
 #define U_L_L_I unsigned long long int
-#define MAXCPUS	48
+#define MAXCPUS	128
 
 #define THRESHOLD_BETWEEN_0_6000(cond) (cond>=0 && cond <=10000)? cond: __builtin_inf()
 
@@ -403,13 +403,15 @@ int setActualCpuClockRate()
 
 int setCpuSocketInfo()
 {
-    regex_t re_physicalid, re_socket0, re_socket1;
+    regex_t re_physicalid, re_socket0, re_socket1, re_socket2, re_socket3;
     int ii, reti, socket;
     char msgbuf[100];
 
     regcomp(&re_physicalid, "^physical[ \t]*id[ \t]*:[ \t]*[0-9]", 0);
     regcomp(&re_socket0, "^physical[ \t]*id[ \t]*:[ \t]*0", 0);
     regcomp(&re_socket1, "^physical[ \t]*id[ \t]*:[ \t]*1", 0);
+    regcomp(&re_socket2, "^physical[ \t]*id[ \t]*:[ \t]*2", 0);
+    regcomp(&re_socket3, "^physical[ \t]*id[ \t]*:[ \t]*3", 0);
 
     FILE * fp;
     char * line = NULL;
@@ -432,6 +434,14 @@ int setCpuSocketInfo()
             reti = regexec(&re_socket1, line, 0, NULL, 0);
             if (!reti) {
                 socket = 1;
+            }
+            reti = regexec(&re_socket2, line, 0, NULL, 0);
+            if (!reti) {
+                socket = 2;
+            }
+            reti = regexec(&re_socket3, line, 0, NULL, 0);
+            if (!reti) {
+                socket = 3;
             }
             _SOCKET[ii] = socket;
             _CPUCOUNT = ii;
@@ -469,10 +479,10 @@ int main(int argc, char *argv[])
     if(_DEBUG == 1)
         printf("Set debug on\n");
 
-    int ii, socket0_cpunum, socket1_cpunum;
-    long socket0, socket1;
-    socket0_cpunum = socket1_cpunum = 0;
-    socket0 = socket1 = 0;
+    int ii, socket0_cpunum, socket1_cpunum, socket2_cpunum, socket3_cpunum;
+    long socket0, socket1, socket2, socket3;
+    socket0_cpunum = socket1_cpunum = socket2_cpunum = socket3_cpunum = 0;
+    socket0 = socket1 = socket2 = socket3 = 0;
 
     if(_DEBUG == 1)
         printf("ProcId\tSocket\tFreq\t\tMult\n");
@@ -488,6 +498,14 @@ int main(int argc, char *argv[])
                 socket1_cpunum += 1;
                 socket1 += (long)floor(_FREQ[ii]);
             }
+            if(_SOCKET[ii] == 2) {
+                socket2_cpunum += 1;
+                socket2 += (long)floor(_FREQ[ii]);
+            }
+            if(_SOCKET[ii] == 3) {
+                socket3_cpunum += 1;
+                socket3 += (long)floor(_FREQ[ii]);
+            }
         }
     }
     if(socket0_cpunum > 0)  {
@@ -495,6 +513,12 @@ int main(int argc, char *argv[])
     }
     if(socket1_cpunum > 0)  {
         printf( " %lu", (socket1 / socket1_cpunum));
+    }
+    if(socket2_cpunum > 0)  {
+        printf( " %lu", (socket2 / socket2_cpunum));
+    }
+    if(socket3_cpunum > 0)  {
+        printf( " %lu", (socket3 / socket3_cpunum));
     }
     printf("\n");
 }
